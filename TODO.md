@@ -24,6 +24,8 @@ ignored params to `online_read`: `requested_features`. Implement its usage
 
 more settings in connection creation (CL, LBP, ... ?) perhaps later
 
+docstrings as education requires
+
 ## Open questions
 
 we avoid insertion of nulls for `created_ts`: check it does not create problems (potentially, a wrong ts from a preexisting row?)
