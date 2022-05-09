@@ -26,6 +26,7 @@ E_CASSANDRA_NOT_CONFIGURED = "Inconsistent Cassandra configuration: provide exac
 E_CASSANDRA_MISCONFIGURED = "Inconsistent Cassandra configuration: provide either 'hosts or 'secure_bundle_path', not both"
 E_CASSANDRA_INCONSISTENT_AUTH = "Username and password for Cassandra must be provided either both or none"
 
+
 class CassandraOnlineStoreConfig(FeastConfigBaseModel):
     """
     Configuration for the Cassandra/Astra DB online store.
@@ -94,7 +95,7 @@ class CassandraOnlineStore(OnlineStore):
                 )
             else:
                 # we use 'secure_bundle_path'
-                self._cluster = cassandra.cluster.Cluster(
+                self._cluster = Cluster(
                     cloud={
                         'secure_connect_bundle': secure_bundle_path,
                     },

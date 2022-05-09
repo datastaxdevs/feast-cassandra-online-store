@@ -1,2 +1,0 @@
-pytest>=6.2.4
-cassandra-driver>=3.24.0,<4
