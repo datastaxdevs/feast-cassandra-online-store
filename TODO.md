@@ -4,9 +4,6 @@
 
 ### For release
 
-batch insertion within each `entity_key`
-(on a single partition can be UNLOGGED)
-
 ### Later
 
 The usual protocol version and load balancer warnings, see if want to go away through settings?
