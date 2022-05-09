@@ -1,33 +1,22 @@
 # TODO
 
-## Testing
-
-test (c* and astra) in a real case now and at the end of improvements
-
 ## Code improvements
 
-The usual protocol version and load balancer warnings, see if want to go away through settings?
-(both Astra and Cassandra)
-
-Use `@tracing_span` and `@log_exception_and_usage`
-
-Try to map to Feast errors (`feast/errors.py`)
-
-refactor/regroup CQL layer
+### For release
 
 batch insertion within each `entity_key`
 
 use prepared statements for reads and writes, cache them manually and per-table
+and log the caching and the preparing
 
-add type annotations in all function signatures
+### Later
+
+The usual protocol version and load balancer warnings, see if want to go away through settings?
+(both Astra and Cassandra)
 
 (to what extent?) sanitize table names
 
-ignored params to `online_read`: `requested_features`. Implement its usage
-
 more settings in connection creation (CL, LBP, ... ?) perhaps later
-
-docstrings as education requires
 
 ## Open questions
 
@@ -41,9 +30,13 @@ ignored param `entities` to `teardown`: this is also ignored by major stores, ch
 
 is it necessary to create a provider? (it seems it does not add much)
 
+my usage of with `tracing_span`: individually for each call to the CQL driver ops, is that the right way? (comparing with other datastores one is not so sure)
+
 ## Missing components
 
 setup.py / package distribution stuff
+    REQUIRES_PYTHON = ">=3.7.0"
+    python_requires=REQUIRES_PYTHON,
 
 is a provider needed?
 

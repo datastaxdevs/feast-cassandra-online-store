@@ -27,12 +27,13 @@ else:
 CASSANDRA_CONFIG = {
     k: v
     for k, v in {
-        "type": "feast_cassandra_online_store.cassandra_online_store.CassandraOnlineStore",
-        "hosts": hosts,
-        "port": port,
-        "keyspace": CASSANDRA_KEYSPACE,
-        "username": CASSANDRA_USERNAME,
-        "password": CASSANDRA_PASSWORD,
+        'type': ('feast_cassandra_online_store.cassandra_online_store'
+                 '.CassandraOnlineStore'),
+        'hosts': hosts,
+        'port': port,
+        'keyspace': CASSANDRA_KEYSPACE,
+        'username': CASSANDRA_USERNAME,
+        'password': CASSANDRA_PASSWORD,
     }.items()
     if v is not None
 }
