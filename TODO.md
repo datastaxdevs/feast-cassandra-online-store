@@ -5,7 +5,7 @@
 ### For release
 
 batch insertion within each `entity_key`
-on a single partition can be UNLOGGED
+(on a single partition can be UNLOGGED)
 
 ### Later
 

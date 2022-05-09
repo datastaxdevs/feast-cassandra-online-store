@@ -463,13 +463,8 @@ class CassandraOnlineStore(OnlineStore):
             **kwargs,
         )
         if prepare:
-            cache_key = tuple(
-                [op_name, fqtable] +
-                [
-                    '%s@%s' % (str(v), str(k))
-                    for k, v in sorted(kwargs.items())
-                ]
-            )
+            # using the statement itself as key (no problem with that)
+            cache_key = statement
             if cache_key not in self._prepared_statements:
                 logger.info(f"Preparing a {op_name} statement on {fqtable}.")
                 self._prepared_statements[cache_key] = \
