@@ -42,14 +42,14 @@ E_CASSANDRA_INCONSISTENT_AUTH = (
 # CQL command templates (that is, before replacing schema names)
 INSERT_CQL_4_TEMPLATE = ("INSERT INTO {fqtable} (feature_name,"
                          " value, entity_key, event_ts) VALUES"
-                         " (%s, %s, %s, %s);")
+                         " (?, ?, ?, ?);")
 
 INSERT_CQL_5_TEMPLATE = ("INSERT INTO {fqtable} (feature_name, "
                          "value, entity_key, event_ts, created_ts)"
-                         " VALUES (%s, %s, %s, %s, %s);")
+                         " VALUES (?, ?, ?, ?, ?);")
 
 SELECT_CQL_TEMPLATE = ("SELECT {columns} FROM {fqtable}"
-                       " WHERE entity_key = %s;")
+                       " WHERE entity_key = ?;")
 
 CREATE_TABLE_CQL_TEMPLATE = """
     CREATE TABLE IF NOT EXISTS {fqtable} (
@@ -63,6 +63,17 @@ CREATE_TABLE_CQL_TEMPLATE = """
 """
 
 DROP_TABLE_CQL_TEMPLATE = "DROP TABLE IF EXISTS {fqtable};"
+
+# op_name -> (cql template string, prepare boolean)
+CQL_TEMPLATE_MAP = {
+    # Queries/DML, statements to be prepared
+    'insert4': (INSERT_CQL_4_TEMPLATE, True),
+    'insert5': (INSERT_CQL_5_TEMPLATE, True),
+    'select': (SELECT_CQL_TEMPLATE, True),
+    # DDL, do not prepare these
+    'drop': (DROP_TABLE_CQL_TEMPLATE, False),
+    'create': (CREATE_TABLE_CQL_TEMPLATE, False),
+}
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -119,11 +130,13 @@ class CassandraOnlineStore(OnlineStore):
         _session:   (DataStax Cassandra drivers) session object
                     to issue commands.
         _keyspace:  Cassandra keyspace all tables live in.
+        _prepared_statements: cache of statements prepared by the driver.
     """
 
     _cluster: Cluster = None
     _session: Session = None
     _keyspace: str = None
+    _prepared_statements = {}
 
     def _get_session(self, config: RepoConfig):
         """
@@ -213,16 +226,13 @@ class CassandraOnlineStore(OnlineStore):
                       rows is written to the online store. Can be used to
                       display progress.
         """
-        session = self._get_session(config)
         project = config.project
-        keyspace = self._keyspace
-
+        #
         for entity_key, values, timestamp, created_ts in data:
             entity_key_bin = serialize_entity_key(entity_key).hex()
             with tracing_span(name="remote_call"):
-                self._write_rows(session, keyspace, project, table,
-                                 entity_key_bin, values.items(), timestamp,
-                                 created_ts)
+                self._write_rows(config, project, table, entity_key_bin,
+                                 values.items(), timestamp, created_ts)
             if progress:
                 progress(1)
 
@@ -244,9 +254,7 @@ class CassandraOnlineStore(OnlineStore):
             entity_keys: a list of entity keys that should be read
                          from the FeatureStore.
         """
-        session = self._get_session(config)
         project = config.project
-        keyspace = self._keyspace
 
         result: List[Tuple[Optional[datetime],
                      Optional[Dict[str, ValueProto]]]] = []
@@ -256,8 +264,7 @@ class CassandraOnlineStore(OnlineStore):
 
             with tracing_span(name="remote_call"):
                 feature_rows = self._read_rows_by_entity_key(
-                    session, keyspace, project,
-                    table, entity_key_bin,
+                    config, project, table, entity_key_bin,
                     proj=["feature_name", "value", "event_ts"],
                 )
 
@@ -295,16 +302,14 @@ class CassandraOnlineStore(OnlineStore):
             tables_to_delete: Tables to delete from the Online Store.
             tables_to_keep: Tables to keep in the Online Store.
         """
-        session = self._get_session(config)
         project = config.project
-        keyspace = self._keyspace
 
         for table in tables_to_keep:
             with tracing_span(name="remote_call"):
-                self._create_table(session, keyspace, project, table)
+                self._create_table(config, project, table)
         for table in tables_to_delete:
             with tracing_span(name="remote_call"):
-                self._drop_table(session, keyspace, project, table)
+                self._drop_table(config, project, table)
 
     @log_exceptions_and_usage(online_store="cassandra")
     def teardown(
@@ -320,13 +325,11 @@ class CassandraOnlineStore(OnlineStore):
             config: The RepoConfig for the current FeatureStore.
             tables: Tables to delete from the feature repo.
         """
-        session = self._get_session(config)
         project = config.project
-        keyspace = self._keyspace
 
         for table in tables:
             with tracing_span(name="remote_call"):
-                self._drop_table(session, keyspace, project, table)
+                self._drop_table(config, project, table)
 
     @staticmethod
     def _fq_table_name(
@@ -340,10 +343,9 @@ class CassandraOnlineStore(OnlineStore):
         """
         return f"\"{keyspace}\".\"{project}_{table.name}\""
 
-    @staticmethod
     def _write_rows(
-        session: Session,
-        keyspace: str,
+        self,
+        config: RepoConfig,
         project: str,
         table: FeatureView,
         entity_key_bin: bytes,
@@ -357,16 +359,21 @@ class CassandraOnlineStore(OnlineStore):
         Note: `created_ts` can be None: in that case we avoid explicitly
         inserting it to prevent unnecessary tombstone creation on Cassandra.
         """
+        session: Session = self._get_session(config)
+        keyspace: str = self._keyspace
+        #
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
         if created_ts is None:
-            insert_cql = INSERT_CQL_4_TEMPLATE.format(
-                keyspace=keyspace,
+            insert_cql = self._get_cql_statement(
+                config,
+                'insert4',
                 fqtable=fqtable,
             )
             fixed_vals = [entity_key_bin, timestamp]
         else:
-            insert_cql = INSERT_CQL_5_TEMPLATE.format(
-                keyspace=keyspace,
+            insert_cql = self._get_cql_statement(
+                config,
+                'insert5',
                 fqtable=fqtable,
             )
             fixed_vals = [entity_key_bin, timestamp, created_ts]
@@ -377,10 +384,9 @@ class CassandraOnlineStore(OnlineStore):
                 [feature_name, val.SerializeToString()] + fixed_vals,
             )
 
-    @staticmethod
     def _read_rows_by_entity_key(
-        session: Session,
-        keyspace: str,
+        self,
+        config: RepoConfig,
         project: str,
         table: FeatureView,
         entity_key_bin: bytes,
@@ -389,40 +395,85 @@ class CassandraOnlineStore(OnlineStore):
         """
         Handle the CQL (low-level) reading of feature values from a table.
         """
+        session: Session = self._get_session(config)
+        keyspace: str = self._keyspace
+        #
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
-        select_cql = SELECT_CQL_TEMPLATE.format(
-            columns="*" if proj is None else ", ".join(proj),
-            keyspace=keyspace,
+        columns="*" if proj is None else ", ".join(proj)
+        select_cql = self._get_cql_statement(
+            config,
+            'select',
             fqtable=fqtable,
+            columns=columns,
         )
         return session.execute(select_cql, [entity_key_bin])
 
-    @staticmethod
     def _drop_table(
-        session: Session,
-        keyspace: str,
+        self,
+        config: RepoConfig,
         project: str,
         table: FeatureView,
     ):
         """Handle the CQL (low-level) deletion of a table."""
+        session: Session = self._get_session(config)
+        keyspace: str = self._keyspace
+        #
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
-        drop_cql = DROP_TABLE_CQL_TEMPLATE.format(
-            fqtable=fqtable,
-        )
+        drop_cql = self._get_cql_statement(config, 'drop', fqtable)
         logger.info(f"Deleting table {fqtable}.")
         session.execute(drop_cql)
 
-    @staticmethod
     def _create_table(
-        session: Session,
-        keyspace: str,
+        self,
+        config: RepoConfig,
         project: str,
         table: FeatureView,
     ):
         """Handle the CQL (low-level) creation of a table."""
+        session: Session = self._get_session(config)
+        keyspace: str = self._keyspace
+        #
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
-        create_cql = CREATE_TABLE_CQL_TEMPLATE.format(
-            fqtable=fqtable,
-        )
+        create_cql = self._get_cql_statement(config, 'create', fqtable)
         logger.info(f"Creating table {fqtable}.")
         session.execute(create_cql)
+
+    def _get_cql_statement(
+        self,
+        config: RepoConfig,
+        op_name: str,
+        fqtable: str,
+        **kwargs,
+    ):
+        """
+        Resolve an 'op_name' (create, insert4, etc) into a CQL statement
+        ready to be bound to parameters when executing.
+
+        If the statement is defined to be 'prepared', use an instance-specific
+        cache of prepared statements.
+
+        This additional layer makes it easy to control whether to use prepared
+        statements and, if so, on which database operations.
+        """
+        session: Session = self._get_session(config)
+        #
+        template, prepare = CQL_TEMPLATE_MAP[op_name]
+        statement = template.format(
+            fqtable=fqtable,
+            **kwargs,
+        )
+        if prepare:
+            cache_key = tuple(
+                [op_name, fqtable] +
+                [
+                    '%s@%s' % (str(v), str(k))
+                    for k, v in sorted(kwargs.items())
+                ]
+            )
+            if cache_key not in self._prepared_statements:
+                logger.info(f"Preparing a {op_name} statement on {fqtable}.")
+                self._prepared_statements[cache_key] = \
+                    session.prepare(statement)
+            return self._prepared_statements[cache_key]
+        else:
+            return statement
