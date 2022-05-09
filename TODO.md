@@ -22,8 +22,6 @@ more settings in connection creation (CL, LBP, ... ?) perhaps later
 
 we avoid insertion of nulls for `created_ts`: check it does not create problems (potentially, a wrong ts from a preexisting row?)
 
-check if to_naive_utc is a feast requirement somehow (so far commented to identity)
-
 ignored params to `update`: `['entities_to_delete, entities_to_keep, partial]`. Not sure what they should control, docs says little to nothing. Make this clear (major online stores seem to ignore these params as well)
 
 ignored param `entities` to `teardown`: this is also ignored by major stores, check better

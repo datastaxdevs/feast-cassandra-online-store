@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import (Sequence, List, Optional, Tuple, Dict, Callable,
                     Any, Iterable)
 
-# import pytz
 from feast import RepoConfig, FeatureView, Entity
 from feast.infra.key_encoding_utils import serialize_entity_key
 from feast.infra.online_stores.online_store import OnlineStore
@@ -179,8 +178,6 @@ class CassandraOnlineStore(OnlineStore):
 
         for entity_key, values, timestamp, created_ts in data:
             entity_key_bin = serialize_entity_key(entity_key).hex()
-            timestamp = _to_naive_utc(timestamp)
-            created_ts = _to_naive_utc(created_ts)
             with tracing_span(name="remote_call"):
                 self._write_rows(session, keyspace, project, table,
                                  entity_key_bin, values.items(), timestamp,
@@ -405,12 +402,3 @@ class CassandraOnlineStore(OnlineStore):
         )
         logger.info(f"Creating table {fqtable}.")
         session.execute(create_cql)
-
-
-def _to_naive_utc(ts: datetime) -> datetime:
-    """Perform normalization to naive-UTC of a datetime."""
-    return ts
-    # if ts.tzinfo is None:
-    #     return ts
-    # else:
-    #     return ts.astimezone(pytz.utc).replace(tzinfo=None)
