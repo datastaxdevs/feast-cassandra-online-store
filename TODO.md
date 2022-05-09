@@ -16,7 +16,9 @@ Add a license (which one?) and file headers
 
 #### Documentation
 
-A `README` with self-sufficient quickstart documentation (for users).
+install instructions
+
+link to aa page on feast
 
 ## Improvements to code
 
