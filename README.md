@@ -41,7 +41,7 @@ online_store:
         - 192.168.1.1
         - 192.168.1.2
         - 192.168.1.3
-    keyspace: feastks
+    keyspace: KeyspaceName
     port: 9042        # optional
     username: user    # optional
     password: secret  # optional
