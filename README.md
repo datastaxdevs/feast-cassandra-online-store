@@ -1,6 +1,8 @@
 # Feast Cassandra / Astra DB online store plugin
 
-A Feast plugin to use [Apache Cassandra™](https://cassandra.apache.org) / 
+A [Feast](https://feast.dev/)
+plugin to use
+[Apache Cassandra™](https://cassandra.apache.org) / 
 [Astra DB](https://astra.datastax.com/) as online store.
 
 ## Installation
@@ -19,8 +21,8 @@ is a matter of altering the `online_store` key in `feature_store.yaml`.
 With reference to the [Feast quickstart](https://docs.feast.dev/getting-started/quickstart),
 the minimal steps are:
 
-1. installing Feast;
-2. creating a feature repository, `feaast init feature_repo`;
+1. (assuming both `feast` and this plugin are installed)
+2. creating a feature repository, `feast init feature_repo`;
 3. `cd feature_repo`;
 4. editing the `feature_store.yaml` as detailed below;
 5. all subsequent steps proceed as usual.
