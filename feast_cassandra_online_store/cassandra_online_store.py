@@ -22,6 +22,7 @@ from cassandra.cluster import Cluster, Session, ResultSet
 from cassandra.auth import PlainTextAuthProvider
 
 
+# Error messages
 E_CASSANDRA_UNEXPECTED_CONFIGURATION_CLASS = (
     "Unexpected configuration object (not a "
     "CassandraOnlineStoreConfig instance)"
@@ -38,6 +39,32 @@ E_CASSANDRA_INCONSISTENT_AUTH = (
     "Username and password for Cassandra must be provided either both or none"
 )
 
+# CQL command templates (that is, before replacing schema names)
+INSERT_CQL_4_TEMPLATE = ("INSERT INTO {fqtable} (feature_name,"
+                         " value, entity_key, event_ts) VALUES"
+                         " (%s, %s, %s, %s);")
+
+INSERT_CQL_5_TEMPLATE = ("INSERT INTO {fqtable} (feature_name, "
+                         "value, entity_key, event_ts, created_ts)"
+                         " VALUES (%s, %s, %s, %s, %s);")
+
+SELECT_CQL_TEMPLATE = ("SELECT {columns} FROM {fqtable}"
+                       " WHERE entity_key = %s;")
+
+CREATE_TABLE_CQL_TEMPLATE = """
+    CREATE TABLE IF NOT EXISTS {fqtable} (
+        entity_key      TEXT,
+        feature_name    TEXT,
+        value           BLOB,
+        event_ts        TIMESTAMP,
+        created_ts      TIMESTAMP,
+        PRIMARY KEY ((entity_key), feature_name)
+    ) WITH CLUSTERING ORDER BY (feature_name ASC);
+"""
+
+DROP_TABLE_CQL_TEMPLATE = "DROP TABLE IF EXISTS {fqtable};"
+
+# Logger
 logger = logging.getLogger(__name__)
 
 
@@ -59,15 +86,28 @@ class CassandraOnlineStoreConfig(FeastConfigBaseModel):
     """
     _full_class_name = ("feast_cassandra_online_store.cassandra_online_store"
                         ".CassandraOnlineStore")
+    #
     type: Literal["cassandra", _full_class_name] = _full_class_name
+    """Online store type selector."""
 
     # settings for connection to Cassandra / Astra DB
     hosts: Optional[List[StrictStr]] = None
+    """List of host addresses to reach the cluster."""
+
     secure_bundle_path: Optional[StrictStr] = None
+    """Path to the secure connect bundle (for Astra DB; replaces hosts)."""
+
     port: Optional[StrictInt] = None
-    keyspace: Optional[StrictStr] = None
+    """Port number for connecting to the cluster (optional)."""
+
+    keyspace: StrictStr = None
+    """Target Cassandra keyspace where all tables will be."""
+
     username: Optional[StrictStr] = None
+    """Username for DB auth, possibly Astra DB token Client ID."""
+
     password: Optional[StrictStr] = None
+    """Password for DB auth, possibly Astra DB token Client Secret."""
 
 
 class CassandraOnlineStore(OnlineStore):
@@ -75,9 +115,10 @@ class CassandraOnlineStore(OnlineStore):
     Cassandra/Astra DB online store implementation for Feast.
 
     Attributes:
-        _cluster: Cassandra cluster to connect to.
-        _session: (DataStax Cassandra drivers) session object
-                  to issue commands.
+        _cluster:   Cassandra cluster to connect to.
+        _session:   (DataStax Cassandra drivers) session object
+                    to issue commands.
+        _keyspace:  Cassandra keyspace all tables live in.
     """
 
     _cluster: Cluster = None
@@ -318,19 +359,13 @@ class CassandraOnlineStore(OnlineStore):
         """
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
         if created_ts is None:
-            insert_cql_4_template = ("INSERT INTO {fqtable} (feature_name,"
-                                     " value, entity_key, event_ts) VALUES"
-                                     " (%s, %s, %s, %s);")
-            insert_cql = insert_cql_4_template.format(
+            insert_cql = INSERT_CQL_4_TEMPLATE.format(
                 keyspace=keyspace,
                 fqtable=fqtable,
             )
             fixed_vals = [entity_key_bin, timestamp]
         else:
-            insert_cql_5_template = ("INSERT INTO {fqtable} (feature_name, "
-                                     "value, entity_key, event_ts, created_ts)"
-                                     " VALUES (%s, %s, %s, %s, %s);")
-            insert_cql = insert_cql_5_template.format(
+            insert_cql = INSERT_CQL_5_TEMPLATE.format(
                 keyspace=keyspace,
                 fqtable=fqtable,
             )
@@ -355,9 +390,7 @@ class CassandraOnlineStore(OnlineStore):
         Handle the CQL (low-level) reading of feature values from a table.
         """
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
-        select_cql_template = ("SELECT {columns} FROM {fqtable}"
-                               " WHERE entity_key = %s;")
-        select_cql = select_cql_template.format(
+        select_cql = SELECT_CQL_TEMPLATE.format(
             columns="*" if proj is None else ", ".join(proj),
             keyspace=keyspace,
             fqtable=fqtable,
@@ -373,8 +406,7 @@ class CassandraOnlineStore(OnlineStore):
     ):
         """Handle the CQL (low-level) deletion of a table."""
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
-        drop_cql_template = "DROP TABLE IF EXISTS {fqtable};"
-        drop_cql = drop_cql_template.format(
+        drop_cql = DROP_TABLE_CQL_TEMPLATE.format(
             fqtable=fqtable,
         )
         logger.info(f"Deleting table {fqtable}.")
@@ -389,15 +421,7 @@ class CassandraOnlineStore(OnlineStore):
     ):
         """Handle the CQL (low-level) creation of a table."""
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
-        create_cql_template = """CREATE TABLE IF NOT EXISTS {fqtable} (
-            entity_key      TEXT,
-            feature_name    TEXT,
-            value           BLOB,
-            event_ts        TIMESTAMP,
-            created_ts      TIMESTAMP,
-            PRIMARY KEY ((entity_key), feature_name)
-        ) WITH CLUSTERING ORDER BY (feature_name ASC);"""
-        create_cql = create_cql_template.format(
+        create_cql = CREATE_TABLE_CQL_TEMPLATE.format(
             fqtable=fqtable,
         )
         logger.info(f"Creating table {fqtable}.")

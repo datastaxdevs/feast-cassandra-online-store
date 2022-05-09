@@ -4,10 +4,11 @@
 
 ### For release
 
-batch insertion within each `entity_key`
-
 use prepared statements for reads and writes, cache them manually and per-table
 and log the caching and the preparing
+
+batch insertion within each `entity_key`
+on a single partition can be UNLOGGED
 
 ### Later
 
