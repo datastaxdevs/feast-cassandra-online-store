@@ -17,6 +17,11 @@ As the config is given through a yaml, some rework is needed when instantiating 
 
 Make sure no accidental syntax-breaking naming gets in the way.
 
+#### Issues
+
+Issue template(s) on github.
+
+
 ## Open questions/issues
 
 #### No-insertion cells
