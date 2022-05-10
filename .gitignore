@@ -1,9 +1,10 @@
 # custom
 temp_notes.md
 
-# python 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+
+# python 
 *.py[cod]
 *$py.class
 *.prof

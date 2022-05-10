@@ -10,7 +10,7 @@ plugin to use
 Install the plugin alongside Feast with:
 
 ```
-COMMAND TODO
+pip install feast-cassandra
 ```
 
 ## Quick usage

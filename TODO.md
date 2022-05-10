@@ -2,25 +2,13 @@
 
 ## For first release
 
-#### Packaging
-
-Packaging: (`setup.py` and all that): it can use
-```
-    REQUIRES_PYTHON = ">=3.7.0"
-    python_requires=REQUIRES_PYTHON,
-```
-
-#### License
-
-Add a license (which one?) and file headers
-
 #### Documentation
-
-install instructions
 
 link to aa page on feast
 
 ## Improvements to code
+
+Take out batches (gracefully, and from docs as well)
 
 #### More settings
 
