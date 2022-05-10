@@ -1,14 +1,10 @@
 # TODO
 
-## For first release
+## Improvements
 
 #### Documentation
 
-link to aa page on feast
-
-## Improvements to code
-
-Take out batches (gracefully, and from docs as well)
+link to the right Awesome Astra page in the README.
 
 #### More settings
 
