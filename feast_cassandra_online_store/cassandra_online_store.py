@@ -362,7 +362,7 @@ class CassandraOnlineStore(OnlineStore):
         inserting it to prevent unnecessary tombstone creation on Cassandra.
 
         Note: all rows inserted in a single call here belong to the same
-        partition of the same table: using an unlogged batch is OK
+        partition: a good use case for a Cassandra (logged) batch
         """
         session: Session = self._get_session(config)
         keyspace: str = self._keyspace
@@ -383,7 +383,7 @@ class CassandraOnlineStore(OnlineStore):
             )
             fixed_vals = [entity_key_bin, timestamp, created_ts]
         #
-        insertion_batch = BatchStatement(batch_type=BatchType.UNLOGGED)
+        insertion_batch = BatchStatement(batch_type=BatchType.LOGGED)
         for feature_name, val in features_vals:
             insertion_batch.add(
                 insert_cql,
