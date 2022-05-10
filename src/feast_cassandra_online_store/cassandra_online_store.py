@@ -33,8 +33,6 @@ from pydantic import StrictStr, StrictInt
 from pydantic.typing import Literal
 
 from cassandra.cluster import Cluster, Session, ResultSet
-from cassandra.cluster import BatchStatement
-from cassandra.query import BatchType
 from cassandra.auth import PlainTextAuthProvider
 
 
@@ -374,9 +372,6 @@ class CassandraOnlineStore(OnlineStore):
 
         Note: `created_ts` can be None: in that case we avoid explicitly
         inserting it to prevent unnecessary tombstone creation on Cassandra.
-
-        Note: all rows inserted in a single call here belong to the same
-        partition: a good use case for a Cassandra (logged) batch
         """
         session: Session = self._get_session(config)
         keyspace: str = self._keyspace
@@ -397,13 +392,11 @@ class CassandraOnlineStore(OnlineStore):
             )
             fixed_vals = [entity_key_bin, timestamp, created_ts]
         #
-        insertion_batch = BatchStatement(batch_type=BatchType.LOGGED)
         for feature_name, val in features_vals:
-            insertion_batch.add(
+            session.execute(
                 insert_cql,
                 [feature_name, val.SerializeToString()] + fixed_vals,
             )
-        session.execute(insertion_batch)
 
     def _read_rows_by_entity_key(
         self,
