@@ -2,10 +2,6 @@
 
 ## Improvements
 
-#### Documentation
-
-link to the right Awesome Astra page in the README.
-
 #### More settings
 
 Add `protocol_version` and possibly `local_dc`/`load_balancing_policy`, to the settings

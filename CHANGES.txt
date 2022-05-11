@@ -1,6 +1,12 @@
 CHANGES
 =======
 
+0.1.1
+-----
+
+* Credits in README.
+* Link to specific "Awesome Astra" page.
+
 0.1.0
 -----
 

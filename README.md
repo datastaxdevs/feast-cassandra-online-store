@@ -72,8 +72,8 @@ online_store:
 ### More info
 
 For a more detailed walkthrough, please see the
-[Awesome Astra](https://awesome-astra.github.io/docs/pages/tools/)
-documentation.
+[Awesome Astra](https://awesome-astra.github.io/docs/pages/tools/integration/celery/)
+page on the Feast integration.
 
 ## Features
 
@@ -81,3 +81,9 @@ The plugin leverages the architecture of Cassandra for optimal performance:
 
 - table partitioning tailored to data access pattern;
 - prepared statements.
+
+#### Credits
+
+The author of this plugin acknowledges prior exploratory work by
+[`hamzakpt`](https://github.com/hamzakpt) and B. Mortimore,
+on which this implementation is loosely based.
