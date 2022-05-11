@@ -85,5 +85,5 @@ The plugin leverages the architecture of Cassandra for optimal performance:
 #### Credits
 
 The author of this plugin acknowledges prior exploratory work by
-[`hamzakpt`](https://github.com/hamzakpt) and B. Mortimore,
+[`hamzakpt`](https://github.com/hamzakpt) and Brian Mortimore,
 on which this implementation is loosely based.
