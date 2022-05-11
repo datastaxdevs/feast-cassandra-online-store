@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+0.1.2
+-----
+
+* Fixed link to "Awesome Astra" page.
+
 0.1.1
 -----
 

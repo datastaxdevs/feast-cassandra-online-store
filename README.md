@@ -72,7 +72,7 @@ online_store:
 ### More info
 
 For a more detailed walkthrough, please see the
-[Awesome Astra](https://awesome-astra.github.io/docs/pages/tools/integration/celery/)
+[Awesome Astra](https://awesome-astra.github.io/docs/pages/tools/integration/feast/)
 page on the Feast integration.
 
 ## Features
