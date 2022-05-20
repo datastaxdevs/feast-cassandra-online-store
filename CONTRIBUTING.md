@@ -42,3 +42,25 @@ _An environment with "actual" installations, needed for example to run the
 - run `pip install --upgrade pip` ;
 - run `pip install feast` ;
 - run `python setup.py install` .
+
+### Publishing to PyPI
+
+Make sure:
+
+- version has been incremented in `setup.py`;
+- `CHANGES.txt` has been updated;
+- you have a PyPI account with access to `feast-cassandra`.
+
+To build:
+
+```
+rm dist/*
+python setup.py sdist bdist_wheel
+ls dist/    # should show version-named wheel and tarball files
+```
+
+To publish (keep your PyPI credentials ready):
+
+```
+twine upload dist/*
+```
