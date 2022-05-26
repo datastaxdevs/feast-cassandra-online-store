@@ -2,23 +2,17 @@
 
 ## Improvements
 
-#### More settings
-
-Add `protocol_version` and possibly `local_dc`/`load_balancing_policy`, to the settings
-for faster startup, futureproof usage of drivers and less clutter in the logs.
-
-As the config is given through a yaml, some rework is needed when instantiating the `Cluster`.
-
-#### Sanitize table names
-
-Make sure no accidental syntax-breaking naming gets in the way.
-
 #### Issues
 
-Issue template(s) on github.
+Issue template(s) on github. (not if planning to enter Feast' repo itself).
+
 
 
 ## Open questions/issues
+
+#### Schema changes?
+
+"create table if not exist", what about a table changes its schema?
 
 #### No-insertion cells
 
@@ -27,7 +21,7 @@ check it does not create problems (potentially, a wrong ts from a preexisting ro
 
 #### Ignored parameters in store methods
 
-Ther are ignored params to `update`: `['entities_to_delete, entities_to_keep, partial]`.
+There are ignored params to `update`: `[entities_to_delete, entities_to_keep, partial]`.
 Not sure what they should control, docs says little to nothing.
 
 Same for param `entities` to `teardown`: this is also ignored by major stores.

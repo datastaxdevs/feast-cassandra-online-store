@@ -21,6 +21,7 @@ ASTRA_DB_CONFIG = {
     "username": ASTRA_DB_USERNAME,
     "password": ASTRA_DB_PASSWORD,
     "keyspace": ASTRA_DB_KEYSPACE,
+    "protocol_version": 4,
 }
 
 FULL_REPO_CONFIGS = [

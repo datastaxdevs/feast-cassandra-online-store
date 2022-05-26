@@ -8,14 +8,22 @@ Once cloned, make sure the `feast` Git [submodule](https://git-scm.com/book/en/v
 in root of repo, `git submodule init` and `git submodule update`.
 (To advance the commit of the submodule if necessary, `git submodule update --remote` .)
 (If advancing `feast` submodule, one may have to rebuild the protobuf assets:
-`pip install --upgrade setuptools` and `make protos` in the `feast` subdir.)
+`pip install --upgrade setuptools` and `make protos` in the `feast` subdir.
+There may be an error related to generating protos doc, it can be ignored.)
 
 Create a fresh development virtualenv, e.g. `feast-cassandra-dev-39`, and
 `pip install --upgrade pip` in it.
 
-Go to the repo's root. Add this path to the python path, e.g. creating a text
+Go to the repo's root. Add this path and its `src` to the python path, e.g. creating a text
 file such as `~/.virtualenvs/feast-cassandra-dev-39/lib/python3.9/site-packages/custom-path.pth`
-with the path in it. Then deactivate and activate the virtualenv again.
+with two lines in it such as:
+
+```
+[path to repos]/feast-cassandra-online-store/src
+[path to repos]/feast-cassandra-online-store
+```
+
+Then deactivate and activate the virtualenv again.
 _This steps is needed only to make the universal unit test able to import the test
 config definitions later._
 

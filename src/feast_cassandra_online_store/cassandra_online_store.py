@@ -34,7 +34,10 @@ from pydantic.typing import Literal
 
 from cassandra.cluster import Cluster, Session, ResultSet
 from cassandra.auth import PlainTextAuthProvider
-
+#
+from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
+from cassandra.cluster import ExecutionProfile
+from cassandra.cluster import EXEC_PROFILE_DEFAULT
 
 # Error messages
 E_CASSANDRA_UNEXPECTED_CONFIGURATION_CLASS = (
@@ -51,6 +54,9 @@ E_CASSANDRA_MISCONFIGURED = (
 )
 E_CASSANDRA_INCONSISTENT_AUTH = (
     "Username and password for Cassandra must be provided either both or none"
+)
+E_CASSANDRA_UNKNOWN_LB_POLICY = (
+    "Unknown/unsupported Load Balancing Policy name in Cassandra configuration"
 )
 
 # CQL command templates (that is, before replacing schema names)
@@ -116,6 +122,7 @@ class CassandraOnlineStoreConfig(FeastConfigBaseModel):
     """Online store type selector."""
 
     # settings for connection to Cassandra / Astra DB
+
     hosts: Optional[List[StrictStr]] = None
     """List of host addresses to reach the cluster."""
 
@@ -134,6 +141,30 @@ class CassandraOnlineStoreConfig(FeastConfigBaseModel):
     password: Optional[StrictStr] = None
     """Password for DB auth, possibly Astra DB token Client Secret."""
 
+    protocol_version: Optional[StrictInt] = None
+    """Explicit specification of the CQL protocol version used."""
+
+    class CassandraLoadBalancingPolicy(FeastConfigBaseModel):
+        """
+        Configuration block related to the Cluster's load-balancing policy.
+        """
+
+        load_balancing_policy: StrictStr
+        """
+        A stringy description of the load balancing policy to instantiate
+        the cluster with. Supported values:
+            "DCAwareRoundRobinPolicy"
+            "TokenAwarePolicy(DCAwareRoundRobinPolicy)"
+        """
+
+        local_dc: StrictStr = None
+        """The local datacenter, usually necessary to create the policy."""
+
+    load_balancing: Optional[CassandraLoadBalancingPolicy] = None
+    """
+    Details on the load-balancing policy: it will be
+    wrapped into an execution profile if present.
+    """
 
 class CassandraOnlineStore(OnlineStore):
     """
@@ -176,6 +207,7 @@ class CassandraOnlineStore(OnlineStore):
             keyspace = online_store_config.keyspace
             username = online_store_config.username
             password = online_store_config.password
+            protocol_version = online_store_config.protocol_version
 
             db_directions = hosts or secure_bundle_path
             if not db_directions or not keyspace:
@@ -193,12 +225,47 @@ class CassandraOnlineStore(OnlineStore):
             else:
                 auth_provider = None
 
+            # handling of load-balancing policy (optional)
+            if online_store_config.load_balancing:
+                # construct a proper execution profile embedding
+                # the configured LB policy
+                _lbp_name = online_store_config.load_balancing.load_balancing_policy
+                if _lbp_name == 'DCAwareRoundRobinPolicy':
+                    lb_policy = DCAwareRoundRobinPolicy(
+                        local_dc=online_store_config.load_balancing.local_dc,
+                    )
+                elif _lbp_name == 'TokenAwarePolicy(DCAwareRoundRobinPolicy)':
+                    lb_policy = TokenAwarePolicy(DCAwareRoundRobinPolicy(
+                        local_dc=online_store_config.load_balancing.local_dc,
+                    ))
+                else:
+                    raise CassandraInvalidConfig(E_CASSANDRA_UNKNOWN_LB_POLICY)
+
+                # wrap it up in a map of ex.profiles with a default
+                exe_profile = ExecutionProfile(
+                    load_balancing_policy = lb_policy,
+                )
+                execution_profiles = {EXEC_PROFILE_DEFAULT: exe_profile}
+            else:
+                execution_profiles = None
+
+            # additional optional keyword args to Cluster
+            cluster_kwargs = {
+                k: v
+                for k, v in {
+                    'protocol_version': protocol_version,
+                    'execution_profiles': execution_profiles,
+                }.items()
+                if v is not None
+            }
+
             # creation of Cluster (Cassandra vs. Astra)
             if hosts:
                 self._cluster = Cluster(
                     hosts,
                     port=port,
                     auth_provider=auth_provider,
+                    **cluster_kwargs,
                 )
             else:
                 # we use 'secure_bundle_path'
@@ -207,6 +274,7 @@ class CassandraOnlineStore(OnlineStore):
                         "secure_connect_bundle": secure_bundle_path,
                     },
                     auth_provider=auth_provider,
+                    **cluster_kwargs,
                 )
 
             # creation of Session

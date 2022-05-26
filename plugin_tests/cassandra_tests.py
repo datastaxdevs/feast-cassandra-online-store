@@ -34,6 +34,7 @@ CASSANDRA_CONFIG = {
         "keyspace": CASSANDRA_KEYSPACE,
         "username": CASSANDRA_USERNAME,
         "password": CASSANDRA_PASSWORD,
+        "protocol_version": 5,
     }.items()
     if v is not None
 }
