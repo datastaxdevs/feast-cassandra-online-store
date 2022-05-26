@@ -24,7 +24,7 @@ with two lines in it such as:
 ```
 
 Then deactivate and activate the virtualenv again.
-_This steps is needed only to make the universal unit test able to import the test
+_This step is needed only to make the universal unit test able to import the test
 config definitions later._
 
 Install `pip install -r requirements-dev.txt` .

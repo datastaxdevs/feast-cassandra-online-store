@@ -283,6 +283,10 @@ class CassandraOnlineStore(OnlineStore):
 
         return self._session
 
+    def __del__(self):
+        if self._session:
+            self._session.shutdown()
+
     @log_exceptions_and_usage(online_store="cassandra")
     def online_write_batch(
             self,
