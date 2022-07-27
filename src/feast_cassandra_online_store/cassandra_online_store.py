@@ -145,7 +145,7 @@ class CassandraOnlineStoreConfig(FeastConfigBaseModel):
     """Explicit specification of the CQL protocol version used."""
 
     ssl: Optional[StrictBool] = False
-    """if CassandaDB uses ssl for ex CosmosDB"""
+    """if CassandaDB uses ssl ex: CosmosDB"""
 
     class CassandraLoadBalancingPolicy(FeastConfigBaseModel):
         """
