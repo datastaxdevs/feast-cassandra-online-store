@@ -28,8 +28,8 @@ from feast.protos.feast.types.EntityKey_pb2 import EntityKey as EntityKeyProto
 from feast.protos.feast.types.Value_pb2 import Value as ValueProto
 from feast.repo_config import FeastConfigBaseModel
 from feast.usage import log_exceptions_and_usage, tracing_span
-
-from pydantic import StrictStr, StrictInt
+from ssl import PROTOCOL_TLSv1_2, SSLContext, CERT_NONE
+from pydantic import StrictStr, StrictInt, StrictBool
 from pydantic.typing import Literal
 
 from cassandra.cluster import Cluster, Session, ResultSet
@@ -144,6 +144,9 @@ class CassandraOnlineStoreConfig(FeastConfigBaseModel):
     protocol_version: Optional[StrictInt] = None
     """Explicit specification of the CQL protocol version used."""
 
+    ssl: Optional[StrictBool] = False
+    """if CassandaDB uses ssl for ex CosmosDB"""
+
     class CassandraLoadBalancingPolicy(FeastConfigBaseModel):
         """
         Configuration block related to the Cluster's load-balancing policy.
@@ -208,6 +211,7 @@ class CassandraOnlineStore(OnlineStore):
             username = online_store_config.username
             password = online_store_config.password
             protocol_version = online_store_config.protocol_version
+            ssl = online_store_config.ssl
 
             db_directions = hosts or secure_bundle_path
             if not db_directions or not keyspace:
@@ -261,12 +265,20 @@ class CassandraOnlineStore(OnlineStore):
 
             # creation of Cluster (Cassandra vs. Astra)
             if hosts:
+                if ssl:
+                    ssl_context = SSLContext(PROTOCOL_TLSv1_2)
+                    ssl_context.verify_mode = CERT_NONE
+                else:
+                    ssl_context = None
                 self._cluster = Cluster(
                     hosts,
                     port=port,
                     auth_provider=auth_provider,
+                    ssl_context=ssl_context,
+                    
                     **cluster_kwargs,
                 )
+          
             else:
                 # we use 'secure_bundle_path'
                 self._cluster = Cluster(
