@@ -475,12 +475,12 @@ class CassandraOnlineStore(OnlineStore):
                 fqtable=fqtable,
             )
             fixed_vals = [entity_key_bin, timestamp, created_ts]
-        #
-        features_val = [ [feature_name ,val.SerializeToString() ] for feature_name, val in features_vals]
+        
+        features_val = [ [feature_name ,val.SerializeToString() ] for feature_name, val in features_vals][0]
         
         session.execute(
                 insert_cql,
-                features_val[0] + fixed_vals,
+                features_val + fixed_vals,
             )
 
     def _read_rows_by_entity_key(
