@@ -15,8 +15,9 @@
 
     Cassandra/Astra DB online store for Feast.
 """
-
+from joblib import Parallel, delayed
 import logging
+import time
 from datetime import datetime
 from typing import (Sequence, List, Optional, Tuple, Dict, Callable,
                     Any, Iterable)
@@ -38,6 +39,7 @@ from cassandra.auth import PlainTextAuthProvider
 from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
 from cassandra.cluster import ExecutionProfile
 from cassandra.cluster import EXEC_PROFILE_DEFAULT
+
 
 # Error messages
 E_CASSANDRA_UNEXPECTED_CONFIGURATION_CLASS = (
@@ -322,6 +324,32 @@ class CassandraOnlineStore(OnlineStore):
             if progress:
                 progress(1)
 
+
+    @log_exceptions_and_usage(online_store="cassandra")
+    def getResult(
+            self,
+            data,
+    ):
+        config,table,entity_key,requested_features,project = data
+        entity_key_bin = serialize_entity_key(entity_key).hex()
+
+        with tracing_span(name="remote_call"):
+            feature_rows = self._read_rows_by_entity_key(
+                config, project, table, entity_key_bin,
+                proj=["feature_name", "value", "event_ts"],
+            )
+
+        res = {}
+        res_ts = None
+        for feature_row in feature_rows:
+            if (requested_features is None
+                    or feature_row.feature_name in requested_features):
+                val = ValueProto()
+                val.ParseFromString(feature_row.value)
+                res[feature_row.feature_name] = val
+                res_ts = feature_row.event_ts
+        return res,res_ts
+
     @log_exceptions_and_usage(online_store="cassandra")
     def online_read(
             self,
@@ -341,33 +369,25 @@ class CassandraOnlineStore(OnlineStore):
                          from the FeatureStore.
         """
         project = config.project
-
+        
         result: List[Tuple[Optional[datetime],
                      Optional[Dict[str, ValueProto]]]] = []
 
+        data = []
+        results = []
         for entity_key in entity_keys:
-            entity_key_bin = serialize_entity_key(entity_key).hex()
+            data.append([config,table,entity_key,requested_features,project])
 
-            with tracing_span(name="remote_call"):
-                feature_rows = self._read_rows_by_entity_key(
-                    config, project, table, entity_key_bin,
-                    proj=["feature_name", "value", "event_ts"],
-                )
-
-            res = {}
-            res_ts = None
-            for feature_row in feature_rows:
-                if (requested_features is None
-                        or feature_row.feature_name in requested_features):
-                    val = ValueProto()
-                    val.ParseFromString(feature_row.value)
-                    res[feature_row.feature_name] = val
-                    res_ts = feature_row.event_ts
-            #
-            if not res:
+        st = time.time()
+        results = Parallel(n_jobs= -1, backend="threading")\
+            (delayed(self.getResult)(i) for i in data)
+        et = time.time()
+        print("time_taken: ", et-st)
+        for res in results:
+            if not res[0]:
                 result.append((None, None))
             else:
-                result.append((res_ts, res))
+                result.append((res[1], res[0]))
         return result
 
     @log_exceptions_and_usage(online_store="cassandra")
