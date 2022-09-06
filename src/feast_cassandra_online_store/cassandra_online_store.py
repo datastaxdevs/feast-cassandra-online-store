@@ -15,7 +15,6 @@
 
     Cassandra/Astra DB online store for Feast.
 """
-
 import logging
 from datetime import datetime
 from typing import (Sequence, List, Optional, Tuple, Dict, Callable,
@@ -38,6 +37,7 @@ from cassandra.auth import PlainTextAuthProvider
 from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
 from cassandra.cluster import ExecutionProfile
 from cassandra.cluster import EXEC_PROFILE_DEFAULT
+
 
 # Error messages
 E_CASSANDRA_UNEXPECTED_CONFIGURATION_CLASS = (
@@ -70,6 +70,7 @@ INSERT_CQL_5_TEMPLATE = ("INSERT INTO {fqtable} (feature_name, "
 
 SELECT_CQL_TEMPLATE = ("SELECT {columns} FROM {fqtable}"
                        " WHERE entity_key = ?;")
+SELECT_GROUP_CQL_TEMPLATE = ("SELECT {columns} FROM {fqtable} WHERE entity_key IN {entity};")
 
 CREATE_TABLE_CQL_TEMPLATE = """
     CREATE TABLE IF NOT EXISTS {fqtable} (
@@ -90,6 +91,7 @@ CQL_TEMPLATE_MAP = {
     'insert4': (INSERT_CQL_4_TEMPLATE, True),
     'insert5': (INSERT_CQL_5_TEMPLATE, True),
     'select': (SELECT_CQL_TEMPLATE, True),
+    'selectGroup': (SELECT_GROUP_CQL_TEMPLATE, True),
     # DDL, do not prepare these
     'drop': (DROP_TABLE_CQL_TEMPLATE, False),
     'create': (CREATE_TABLE_CQL_TEMPLATE, False),
@@ -344,30 +346,44 @@ class CassandraOnlineStore(OnlineStore):
 
         result: List[Tuple[Optional[datetime],
                      Optional[Dict[str, ValueProto]]]] = []
-
+        
+        resultKey = {}
+        entity_key_bin = []
         for entity_key in entity_keys:
-            entity_key_bin = serialize_entity_key(entity_key).hex()
+            entity_key_one = serialize_entity_key(entity_key).hex()
+            entity_key_bin.append(entity_key_one)
 
-            with tracing_span(name="remote_call"):
-                feature_rows = self._read_rows_by_entity_key(
-                    config, project, table, entity_key_bin,
-                    proj=["feature_name", "value", "event_ts"],
-                )
-
-            res = {}
-            res_ts = None
-            for feature_row in feature_rows:
-                if (requested_features is None
-                        or feature_row.feature_name in requested_features):
-                    val = ValueProto()
-                    val.ParseFromString(feature_row.value)
-                    res[feature_row.feature_name] = val
-                    res_ts = feature_row.event_ts
-            #
-            if not res:
-                result.append((None, None))
+        with tracing_span(name="remote_call"):
+            feature_rows = self._read_rows_by_entity_key(
+                config, project, table, entity_key_bin,
+                proj=["entity_key","feature_name", "value", "event_ts"],
+            )
+        res = {}
+        res_ts = None
+        featureList = set()
+        for feature_row in feature_rows:
+            if feature_row.feature_name in featureList:
+                if res:
+                    resultKey[key] = (res_ts, res)
+                res = {}
+                res_ts = None
+                featureList.clear()
+            key = feature_row.entity_key
+            featureList.add(feature_row.feature_name)
+            if (requested_features is None
+                    or feature_row.feature_name in requested_features):
+                val = ValueProto()
+                val.ParseFromString(feature_row.value)
+                res[feature_row.feature_name] = val
+                res_ts = feature_row.event_ts
+        #
+        if res:
+            resultKey[key] = (res_ts, res)
+        for entity in entity_key_bin:
+            if entity in resultKey:
+                result.append(resultKey[entity])
             else:
-                result.append((res_ts, res))
+                result.append((None,None))
         return result
 
     @log_exceptions_and_usage(online_store="cassandra")
@@ -475,7 +491,7 @@ class CassandraOnlineStore(OnlineStore):
         config: RepoConfig,
         project: str,
         table: FeatureView,
-        entity_key_bin: bytes,
+        entity_key_bin: List[bytes],
         proj: Optional[List[str]] = None,
     ) -> ResultSet:
         """
@@ -486,13 +502,24 @@ class CassandraOnlineStore(OnlineStore):
         #
         fqtable = CassandraOnlineStore._fq_table_name(keyspace, project, table)
         columns="*" if proj is None else ", ".join(proj)
-        select_cql = self._get_cql_statement(
-            config,
-            'select',
-            fqtable=fqtable,
-            columns=columns,
-        )
-        return session.execute(select_cql, [entity_key_bin])
+        if len(entity_key_bin) > 1: 
+            select_cql = self._get_cql_statement(
+                config,
+                'selectGroup',
+                fqtable=fqtable,
+                columns=columns,
+                entity=tuple(entity_key_bin)
+            )
+            print("query is" ,select_cql)
+            return session.execute(select_cql)
+        else:
+            select_cql = self._get_cql_statement(
+                config,
+                'select',
+                fqtable=fqtable,
+                columns=columns,
+            )
+            return session.execute(select_cql, [entity_key_bin[0]])
 
     def _drop_table(
         self,
@@ -557,4 +584,4 @@ class CassandraOnlineStore(OnlineStore):
                     session.prepare(statement)
             return self._prepared_statements[cache_key]
         else:
-            return statement
+            return statement  
