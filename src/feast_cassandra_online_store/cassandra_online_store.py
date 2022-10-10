@@ -510,7 +510,6 @@ class CassandraOnlineStore(OnlineStore):
                 columns=columns,
                 entity=tuple(entity_key_bin)
             )
-            print("query is" ,select_cql)
             return session.execute(select_cql)
         else:
             select_cql = self._get_cql_statement(
