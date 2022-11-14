@@ -1,5 +1,7 @@
 # Feast Cassandra / Astra DB online store plugin
 
+**Notice**: this plugin is DEPRECATED. Refer to the [README](README.md) for more info.
+
 A [Feast](https://feast.dev/)
 plugin to use
 [Apache Cassandra™](https://cassandra.apache.org) / 
