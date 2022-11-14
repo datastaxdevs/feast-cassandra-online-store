@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+0.1.4
+-----
+
+* Deprecation notice (development moved to contrib code in Feast codebase), no other changes in code
+
 0.1.3
 -----
 
